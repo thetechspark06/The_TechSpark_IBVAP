@@ -1,0 +1,109 @@
+# ==============================================================================
+# IBVAP: Intelligent Border / Video Analytics Platform - Configuration File
+# ==============================================================================
+
+application:
+  name: IBVAP
+  mode: demo                    # demo, live, or test
+  log_level: INFO
+  log_file: logs/ibvap.log
+  web_host: 0.0.0.0
+  web_port: 8000
+
+video:
+  source: 'videos/v5.mp4'     # File path, webcam index (0), or RTSP URL
+  output: output/showcase_output.mp4
+  fps_limit: 30
+  record_output: true
+  loop_video: true              # When demo video reaches end, loop video
+  max_loops: 4                  # Number of times to loop video processing (done 4 times)
+
+# Multi-Camera Setup:
+cameras:
+  - camera_id: "CAM_01"
+    name: "Sector 1 - Border Gate CCTV"
+    source: "videos/v5.mp4"
+    camera_type: "recorded"
+    virtual_fence:
+      enabled: false
+      type: line
+      points: []
+      cooldown_seconds: 8
+      trigger_objects:
+        - person
+        - vehicle
+
+  - camera_id: "CAM_02"
+    name: "Sector 2 - Restricted Perimeter"
+    source: "videos/feed_2.mp4"
+    camera_type: "recorded"
+    virtual_fence:
+      enabled: false
+      type: polygon
+      points: []
+      cooldown_seconds: 8
+      trigger_objects:
+        - person
+        - vehicle
+
+models:
+  general: models/yolo11n.pt
+  vehicle: models/vehicle_model.pt
+  plate: models/license_plate_detector.pt
+  face: models/face_model.pt
+  device: auto                  # auto, cuda, or cpu
+
+detection:
+  confidence: 0.30
+  iou_threshold: 0.45
+  image_size: 480 # Optimized for fast CPU inference (44% fewer pixels to compute)
+  classes:
+    person: [0]
+    vehicle: [2, 3, 5, 7]       # car, motorcycle, bus, truck
+
+tracking:
+  enabled: true
+  tracker: bytetrack.yaml       # bytetrack.yaml or botsort.yaml
+  draw_trajectories: false      # Set to false to remove yellow motion tracking lines from video
+  track_high_thresh: 0.25
+  track_low_thresh: 0.10
+  new_track_thresh: 0.30
+  track_buffer: 30
+  match_thresh: 0.80
+
+ocr:
+  enabled: true
+  engine: paddleocr             # paddleocr or robust_fallback
+  min_confidence: 0.60
+  cooldown_seconds: 10          # Avoid repeatedly logging same plate
+
+face:
+  enabled: true
+  min_confidence: 0.40
+  recognition_enabled: false
+  registered_faces_dir: data/registered_faces
+
+virtual_fence:
+  enabled: true
+  type: line                    # line, rect, or polygon
+  # Points: for 'line', provide [p1, p2]; for 'rect', [top_left, bottom_right]; for 'polygon', [p1, p2, p3, ...]
+  points:
+    - [100, 400]
+    - [1100, 400]
+  cooldown_seconds: 8           # Cooldown per track ID to avoid alert spamming
+  trigger_objects:
+    - person
+    - vehicle
+
+database:
+  type: sqlite                  # sqlite or postgresql
+  path: data/ibvap.db
+  # url: postgresql://user:password@localhost:5432/ibvap
+
+snapshots:
+  save_enabled: true
+  directory: output/snapshots
+  events_to_snapshot:
+    - FENCE_VIOLATION
+    - ANPR
+    - FACE_DETECTED
